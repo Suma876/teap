@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Project TEAP – Tender Evaluation & Audit Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600&family=Source+Sans+3:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root {
+      --navy: #002147;
+      --navy-light: #003366;
+      --navy-faint: #e8edf5;
+      --gold: #b8860b;
+      --gold-light: #d4a820;
+      --green: #1a7a4a;
+      --red: #b91c1c;
+      --grey-border: #d1d5db;
+      --grey-bg: #f5f6f8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Source Sans 3', sans-serif;
+      background: var(--grey-bg);
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+    h1, h2, h3, .serif { font-family: 'EB Garamond', Georgia, serif; }
+
+    /* Header */
+    .gov-header {
+      background: var(--navy);
+      border-bottom: 4px solid var(--gold);
+    }
+    .gov-header .emblem {
+      width: 52px; height: 52px;
+      background: radial-gradient(circle, #d4a820 30%, #b8860b 70%);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; color: var(--navy);
+      box-shadow: 0 0 0 3px #fff2, 0 0 0 5px #d4a82055;
+    }
+    .sub-nav {
+      background: #fff;
+      border-bottom: 1px solid var(--grey-border);
+    }
+    .nav-tab {
+      padding: 10px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      cursor: pointer;
+      color: #555;
+      border-bottom: 3px solid transparent;
+      transition: all .2s;
+    }
+    .nav-tab.active, .nav-tab:hover { color: var(--navy); border-color: var(--navy); }
+
+    /* Cards */
+    .card {
+      background: #fff;
+      border: 1px solid var(--grey-border);
+      border-radius: 4px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+    .card-header {
+      background: var(--navy-faint);
+      border-bottom: 1px solid var(--grey-border);
+      padding: 10px 16px;
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--navy);
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    /* Drag-drop zone */
+    .drop-zone {
+      border: 2px dashed #aab4c8;
+      background: #f0f4fb;
+      border-radius: 6px;
+      padding: 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .drop-zone.dragover, .drop-zone:hover {
+      border-color: var(--navy);
+      background: #e0e8f5;
+    }
+
+    /* Agent console */
+    .agent-log { font-family: 'Courier New', monospace; font-size: 12px; background: #0d1117; color: #c9d1d9; border-radius: 4px; }
+    .log-entry { border-left: 3px solid transparent; padding: 4px 10px; }
+    .log-entry.tech  { border-color: #3b82f6; }
+    .log-entry.fin   { border-color: #10b981; }
+    .log-entry.comp  { border-color: #f59e0b; }
+    .log-entry.sys   { border-color: #6b7280; color: #6b7280; }
+    .log-time { color: #586069; margin-right: 6px; }
+    .log-agent { font-weight: 700; margin-right: 6px; }
+    .agent-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      display: inline-block;
+      background: #ccc;
+    }
+    .agent-dot.active { background: #10b981; animation: pulse-dot 1.2s infinite; }
+    @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    /* Fairness scorecard table */
+    .score-table th { background: var(--navy-faint); color: var(--navy); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+    .score-table td, .score-table th { padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-size: 13px; }
+    .badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+    .badge-ok   { background: #d1fae5; color: #065f46; }
+    .badge-warn { background: #fef3c7; color: #92400e; }
+    .badge-fail { background: #fee2e2; color: #991b1b; }
+
+    /* Receipt modal */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,21,47,.55);
+      backdrop-filter: blur(3px);
+      z-index: 1000;
+      display: none; align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: #fff;
+      border: 1px solid var(--grey-border);
+      border-top: 5px solid var(--navy);
+      border-radius: 4px;
+      width: 680px; max-width: 95vw;
+      max-height: 85vh; overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,.3);
+    }
+
+    /* DPIIT badges */
+    .dpiit-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e5e7eb; }
+    .status-pill { padding: 3px 12px; border-radius: 12px; font-size: 12px; font-weight: 700; }
+    .status-pill.green { background: #d1fae5; color: #065f46; }
+    .status-pill.red   { background: #fee2e2; color: #991b1b; }
+    .status-pill.amber { background: #fef3c7; color: #92400e; }
+
+    /* PII scan animation */
+    .scan-bar {
+      height: 4px; background: linear-gradient(90deg,var(--navy),#4f8ef7,var(--navy));
+      background-size: 200%;
+      border-radius: 2px;
+      animation: scan-anim 1.4s linear infinite;
+      display: none;
+    }
+    .scan-bar.active { display: block; }
+    @keyframes scan-anim { 0%{background-position:100%} 100%{background-position:-100%} }
+
+    /* Mitigate button */
+    .btn-primary {
+      background: var(--navy); color: #fff;
+      border: none; border-radius: 3px;
+      padding: 8px 20px; font-size: 13px; font-weight: 700;
+      letter-spacing: .04em; cursor: pointer;
+      transition: background .2s;
+    }
+    .btn-primary:hover { background: var(--navy-light); }
+    .btn-secondary {
+      background: #fff; color: var(--navy);
+      border: 1px solid var(--navy); border-radius: 3px;
+      padding: 8px 20px; font-size: 13px; font-weight: 700;
+      letter-spacing: .04em; cursor: pointer;
+      transition: all .2s;
+    }
+    .btn-secondary:hover { background: var(--navy-faint); }
+
+    /* Sidebar layout */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 18px;
+    }
+    @media(max-width: 900px) {
+      .main-grid { grid-template-columns: 1fr; }
+    }
+
+    /* File item */
+    .file-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 12px;
+      background: #f8f9fb;
+      border: 1px solid #e5e7eb;
+      border-radius: 4px;
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+    .file-progress { flex: 1; height: 4px; background: #e5e7eb; border-radius: 2px; overflow: hidden; }
+    .file-progress-bar { height: 100%; background: var(--navy); width: 0%; transition: width 1.2s ease; border-radius: 2px; }
+
+    /* Section divider */
+    .section-label {
+      font-size: 11px; font-weight: 700; letter-spacing: .1em;
+      text-transform: uppercase; color: #9ca3af;
+      margin-bottom: 6px; margin-top: 18px;
+      padding-bottom: 4px; border-bottom: 1px solid #e5e7eb;
+    }
+
+    /* Ticker strip */
+    .ticker-strip {
+      background: var(--navy);
+      color: #fff;
+      font-size: 11px;
+      padding: 4px 0;
+      overflow: hidden;
+    }
+    .ticker-inner {
+      display: inline-flex;
+      gap: 60px;
+      animation: ticker 30s linear infinite;
+      white-space: nowrap;
+    }
+    @keyframes ticker { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════ TICKER STRIP ═══════════════ -->
+<div class="ticker-strip">
+  <div class="px-4">
+    <span class="ticker-inner" id="ticker">
+      <span>🔒 CLASSIFIED SYSTEM — AUTHORISED ACCESS ONLY &nbsp;|&nbsp; TEAP v2.4.1 &nbsp;|&nbsp; NIC-Secured Node &nbsp;|&nbsp; Session expires in 28:42 &nbsp;|&nbsp; Last Sync: 01-MAY-2026 09:17 IST &nbsp;|&nbsp; Tender Ref: CAPF/MHA/2026/T-0091 &nbsp;|&nbsp; Evaluation Phase: TECHNICAL</span>
+      <span>🔒 CLASSIFIED SYSTEM — AUTHORISED ACCESS ONLY &nbsp;|&nbsp; TEAP v2.4.1 &nbsp;|&nbsp; NIC-Secured Node &nbsp;|&nbsp; Session expires in 28:42 &nbsp;|&nbsp; Last Sync: 01-MAY-2026 09:17 IST &nbsp;|&nbsp; Tender Ref: CAPF/MHA/2026/T-0091 &nbsp;|&nbsp; Evaluation Phase: TECHNICAL</span>
+    </span>
+  </div>
+</div>
+
+<!-- ═══════════════ GOV HEADER ═══════════════ -->
+<header class="gov-header">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center gap-5">
+    <!-- National Emblem Placeholder -->
+    <div class="emblem" title="National Emblem of India">
+      <i class="fas fa-star-of-life text-xl" style="color: var(--navy)"></i>
+    </div>
+    <div>
+      <div class="text-white text-xs font-semibold tracking-widest opacity-80" style="letter-spacing:.14em">भारत सरकार</div>
+      <div class="text-white font-bold text-lg leading-tight" style="font-family:'EB Garamond',serif; letter-spacing:.04em">Government of India</div>
+      <div class="text-blue-200 text-xs tracking-wider">Ministry of Home Affairs &nbsp;·&nbsp; Central Armed Police Forces Directorate</div>
+    </div>
+    <div class="ml-auto text-right hidden sm:block">
+      <div class="text-blue-200 text-xs tracking-wider">Project TEAP</div>
+      <div class="text-white font-bold" style="font-family:'EB Garamond',serif;font-size:1.05rem">Tender Evaluation & Audit Portal</div>
+      <div class="text-blue-300 text-xs mt-0.5">Classification: RESTRICTED &nbsp;<i class="fas fa-lock text-xs"></i></div>
+    </div>
+  </div>
+  <!-- Nav -->
+  <div class="sub-nav">
+    <div class="max-w-7xl mx-auto px-4 flex items-center gap-0 overflow-x-auto">
+      <div class="nav-tab active" onclick="switchTab('dashboard')"><i class="fas fa-th-large mr-1"></i> Dashboard</div>
+      <div class="nav-tab" onclick="switchTab('dashboard')"><i class="fas fa-upload mr-1"></i> Ingestion</div>
+      <div class="nav-tab" onclick="switchTab('dashboard')"><i class="fas fa-robot mr-1"></i> Agents</div>
+      <div class="nav-tab" onclick="switchTab('dashboard')"><i class="fas fa-balance-scale mr-1"></i> Fairness</div>
+      <div class="nav-tab" onclick="switchTab('dashboard')"><i class="fas fa-file-certificate mr-1"></i> Receipts</div>
+      <div class="nav-tab" onclick="switchTab('dashboard')"><i class="fas fa-flag mr-1"></i> DPIIT</div>
+      <div class="nav-tab ml-auto" style="color:#b91c1c; border-color:transparent">
+        <i class="fas fa-circle text-green-500 text-xs mr-1"></i> Sanjay Kumar, IPS &nbsp;<i class="fas fa-chevron-down text-xs"></i>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ═══════════════ MAIN CONTENT ═══════════════ -->
+<div class="max-w-7xl mx-auto px-4 py-5">
+
+  <!-- Status bar -->
+  <div class="flex flex-wrap gap-3 mb-5">
+    <div class="card px-4 py-3 flex items-center gap-3 flex-1 min-w-[160px]">
+      <i class="fas fa-folder-open text-2xl" style="color:var(--navy)"></i>
+      <div><div class="text-xs text-gray-500 uppercase font-semibold tracking-wide">Tender ID</div><div class="font-bold text-sm" style="color:var(--navy)">CAPF/MHA/2026/T-0091</div></div>
+    </div>
+    <div class="card px-4 py-3 flex items-center gap-3 flex-1 min-w-[160px]">
+      <i class="fas fa-users text-2xl" style="color:var(--navy)"></i>
+      <div><div class="text-xs text-gray-500 uppercase font-semibold tracking-wide">Bidders Received</div><div class="font-bold text-2xl" style="color:var(--navy)" id="bidderCount">0</div></div>
+    </div>
+    <div class="card px-4 py-3 flex items-center gap-3 flex-1 min-w-[160px]">
+      <i class="fas fa-shield-alt text-2xl" style="color:var(--green)"></i>
+      <div><div class="text-xs text-gray-500 uppercase font-semibold tracking-wide">PII Scanned</div><div class="font-bold text-sm" id="piiStatus" style="color:var(--green)">Awaiting Upload</div></div>
+    </div>
+    <div class="card px-4 py-3 flex items-center gap-3 flex-1 min-w-[160px]">
+      <i class="fas fa-clock text-2xl" style="color:var(--gold)"></i>
+      <div><div class="text-xs text-gray-500 uppercase font-semibold tracking-wide">Evaluation Deadline</div><div class="font-bold text-sm" style="color:var(--gold)">15-MAY-2026</div></div>
+    </div>
+    <div class="card px-4 py-3 flex items-center gap-3 flex-1 min-w-[160px]">
+      <i class="fas fa-gavel text-2xl" style="color:#6366f1"></i>
+      <div><div class="text-xs text-gray-500 uppercase font-semibold tracking-wide">GFR Compliance</div><div id="gfrStatus" class="font-bold text-sm" style="color:#6366f1">Pending</div></div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+
+    <!-- ═══ LEFT COLUMN ═══ -->
+    <div>
+
+      <!-- 1. SECURE INGESTION MODULE -->
+      <div class="card mb-5">
+        <div class="card-header">
+          <i class="fas fa-lock-open"></i> Module 1 — Secure Document Ingestion
+          <span class="ml-auto text-xs font-normal text-gray-500 normal-case tracking-normal">AES-256 Encrypted Channel</span>
+        </div>
+        <div class="p-4">
+          <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()"
+            ondragover="handleDragOver(event)" ondrop="handleDrop(event)" ondragleave="handleDragLeave(event)">
+            <i class="fas fa-cloud-upload-alt text-4xl mb-3" style="color:#9bb3d0"></i>
+            <div class="font-semibold text-gray-700 mb-1">Drag & Drop Bidder Documents Here</div>
+            <div class="text-sm text-gray-400 mb-3">Accepted formats: PDF, DOCX, XLSX &nbsp;·&nbsp; Max 50MB per file</div>
+            <button class="btn-primary text-xs"><i class="fas fa-folder-open mr-2"></i>Browse Files</button>
+            <input type="file" id="fileInput" class="hidden" multiple accept=".pdf,.docx,.xlsx" onchange="handleFileInput(event)">
+          </div>
+
+          <div id="scanStatus" class="mt-3 hidden">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-semibold text-gray-600"><i class="fas fa-fingerprint mr-1 text-blue-500"></i> PII Scan in Progress…</span>
+              <span class="text-xs text-gray-400" id="scanPct">0%</span>
+            </div>
+            <div class="scan-bar active" id="scanBar"></div>
+          </div>
+
+          <div id="fileList" class="mt-3"></div>
+        </div>
+      </div>
+
+      <!-- 2. FAIRNESS SCORECARD -->
+      <div class="card mb-5">
+        <div class="card-header">
+          <i class="fas fa-balance-scale"></i> Module 3 — FairCheck™ Fairness Scorecard
+          <span class="ml-auto">
+            <button class="btn-primary text-xs py-1 px-3" id="mitigateBtn" onclick="mitigateBias()"><i class="fas fa-magic mr-1"></i>Mitigate Bias</button>
+          </span>
+        </div>
+        <div class="p-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Disparate Impact Table -->
+            <div>
+              <div class="section-label">Disparate Impact Ratios (DIR)</div>
+              <table class="score-table w-full text-left rounded overflow-hidden">
+                <thead>
+                  <tr>
+                    <th>Bidder</th>
+                    <th>Category</th>
+                    <th>DIR</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="fairnessTable">
+                  <tr>
+                    <td class="font-semibold">Bharat Systems Ltd.</td>
+                    <td>Large / Public</td>
+                    <td id="dir-1">0.92</td>
+                    <td><span class="badge badge-ok">PASS</span></td>
+                  </tr>
+                  <tr>
+                    <td class="font-semibold">Innovate MSME Co.</td>
+                    <td>MSME / Startup</td>
+                    <td id="dir-2">0.71</td>
+                    <td><span id="badge-2" class="badge badge-warn">REVIEW</span></td>
+                  </tr>
+                  <tr>
+                    <td class="font-semibold">DefenceTech Pvt.</td>
+                    <td>Private / Mid</td>
+                    <td id="dir-3">0.85</td>
+                    <td><span class="badge badge-ok">PASS</span></td>
+                  </tr>
+                  <tr>
+                    <td class="font-semibold">StarShield Infra</td>
+                    <td>Foreign JV</td>
+                    <td id="dir-4">0.58</td>
+                    <td><span id="badge-4" class="badge badge-fail">FAIL</span></td>
+                  </tr>
+                  <tr>
+                    <td class="font-semibold">NovaSec Dynamics</td>
+                    <td>MSME / Women-led</td>
+                    <td id="dir-5">0.78</td>
+                    <td><span id="badge-5" class="badge badge-warn">REVIEW</span></td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="mt-2 text-xs text-gray-400"><i class="fas fa-info-circle mr-1"></i>DIR threshold: ≥0.80 = Pass &nbsp;·&nbsp; 0.70–0.79 = Review &nbsp;·&nbsp; &lt;0.70 = Fail</div>
+            </div>
+            <!-- Chart -->
+            <div>
+              <div class="section-label">Technical Score Distribution</div>
+              <canvas id="fairnessChart" height="200"></canvas>
+              <div class="mt-2 text-xs text-gray-400" id="mitigateNote"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. DETERMINISTIC RECEIPT -->
+      <div class="card mb-5">
+        <div class="card-header">
+          <i class="fas fa-receipt"></i> Module 4 — Deterministic Fairness Receipt Generator
+        </div>
+        <div class="p-4">
+          <div class="flex flex-wrap gap-3 items-end">
+            <div>
+              <label class="text-xs font-semibold text-gray-600 block mb-1">Select Bidder</label>
+              <select id="receiptBidder" class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-700 focus:outline-none focus:border-blue-700" style="min-width:200px">
+                <option>Bharat Systems Ltd.</option>
+                <option>Innovate MSME Co.</option>
+                <option>DefenceTech Pvt.</option>
+                <option>StarShield Infra</option>
+                <option>NovaSec Dynamics</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-gray-600 block mb-1">Evaluation Stage</label>
+              <select id="receiptStage" class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-700 focus:outline-none focus:border-blue-700">
+                <option>Technical Evaluation</option>
+                <option>Financial Evaluation</option>
+                <option>Compliance Check</option>
+              </select>
+            </div>
+            <button class="btn-primary" onclick="generateReceipt()"><i class="fas fa-file-signature mr-2"></i>Generate Fairness Receipt</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ═══ RIGHT SIDEBAR ═══ -->
+    <div>
+
+      <!-- MULTI-AGENT CONSOLE -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <i class="fas fa-microchip"></i> Module 2 — Multi-Agent Console
+        </div>
+        <div class="p-3">
+          <!-- Agent status -->
+          <div class="flex gap-2 mb-3 flex-wrap">
+            <div class="flex-1 border border-gray-200 rounded p-2 text-center bg-gray-50">
+              <span class="agent-dot" id="dot-tech"></span>
+              <div class="text-xs font-bold text-blue-700 mt-1">TECH</div>
+              <div class="text-xs text-gray-400" id="status-tech">Idle</div>
+            </div>
+            <div class="flex-1 border border-gray-200 rounded p-2 text-center bg-gray-50">
+              <span class="agent-dot" id="dot-fin"></span>
+              <div class="text-xs font-bold text-green-700 mt-1">FIN</div>
+              <div class="text-xs text-gray-400" id="status-fin">Idle</div>
+            </div>
+            <div class="flex-1 border border-gray-200 rounded p-2 text-center bg-gray-50">
+              <span class="agent-dot" id="dot-comp"></span>
+              <div class="text-xs font-bold text-yellow-700 mt-1">COMP</div>
+              <div class="text-xs text-gray-400" id="status-comp">Idle</div>
+            </div>
+          </div>
+          <!-- Log -->
+          <div class="agent-log rounded p-2 overflow-y-auto" style="height:260px" id="agentLog">
+            <div class="log-entry sys"><span class="log-time">09:17:01</span><span style="color:#6b7280">[SYS] TEAP Agent Orchestrator v2.4 initialised.</span></div>
+            <div class="log-entry sys"><span class="log-time">09:17:02</span><span style="color:#6b7280">[SYS] Awaiting document ingestion…</span></div>
+          </div>
+          <button class="btn-secondary w-full mt-2 text-xs py-1.5" onclick="runAgents()"><i class="fas fa-play mr-1"></i>Run All Agents</button>
+        </div>
+      </div>
+
+      <!-- DPIIT TRACKER -->
+      <div class="card">
+        <div class="card-header">
+          <i class="fas fa-flag"></i> Module 5 — DPIIT / Make in India Tracker
+        </div>
+        <div class="p-3">
+          <div class="text-xs text-gray-500 mb-3">Per DPIIT Order P-45021/2/2017-PP(BE-II) — Class I / Class II preference applied.</div>
+          <div class="dpiit-row">
+            <div>
+              <div class="text-sm font-semibold">Bharat Systems Ltd.</div>
+              <div class="text-xs text-gray-400">Class I Local Supplier &nbsp;·&nbsp; 67% Local Content</div>
+            </div>
+            <span class="status-pill green"><i class="fas fa-check mr-1"></i>Eligible</span>
+          </div>
+          <div class="dpiit-row">
+            <div>
+              <div class="text-sm font-semibold">Innovate MSME Co.</div>
+              <div class="text-xs text-gray-400">Class II Local Supplier &nbsp;·&nbsp; 54% Local Content</div>
+            </div>
+            <span class="status-pill green"><i class="fas fa-check mr-1"></i>Eligible</span>
+          </div>
+          <div class="dpiit-row">
+            <div>
+              <div class="text-sm font-semibold">DefenceTech Pvt.</div>
+              <div class="text-xs text-gray-400">Class II Local Supplier &nbsp;·&nbsp; 51% Local Content</div>
+            </div>
+            <span class="status-pill amber"><i class="fas fa-exclamation mr-1"></i>Verify</span>
+          </div>
+          <div class="dpiit-row">
+            <div>
+              <div class="text-sm font-semibold">StarShield Infra</div>
+              <div class="text-xs text-gray-400">Foreign JV &nbsp;·&nbsp; 22% Local Content</div>
+            </div>
+            <span class="status-pill red"><i class="fas fa-times mr-1"></i>Ineligible</span>
+          </div>
+          <div class="dpiit-row" style="border-bottom:none">
+            <div>
+              <div class="text-sm font-semibold">NovaSec Dynamics</div>
+              <div class="text-xs text-gray-400">Class I &nbsp;·&nbsp; 71% Local Content</div>
+            </div>
+            <span class="status-pill green"><i class="fas fa-check mr-1"></i>Eligible</span>
+          </div>
+          <div class="mt-3 text-xs text-gray-400 bg-yellow-50 border border-yellow-100 rounded p-2">
+            <i class="fas fa-exclamation-triangle text-yellow-500 mr-1"></i>
+            StarShield Infra's bid will be subject to 20% loading as per GFR Rule 149.
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer class="mt-8 py-4 px-4" style="background:var(--navy); border-top:3px solid var(--gold)">
+  <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-2">
+    <div class="text-blue-200 text-xs">© 2026 Government of India, Ministry of Home Affairs. All rights reserved.</div>
+    <div class="text-blue-300 text-xs flex gap-4">
+      <span><i class="fas fa-server mr-1"></i>NIC Data Centre, New Delhi</span>
+      <span><i class="fas fa-shield-virus mr-1"></i>ISO 27001 Compliant</span>
+      <span><i class="fas fa-lock mr-1"></i>MEITY Empanelled</span>
+    </div>
+  </div>
+</footer>
+
+<!-- ═══════════════ RECEIPT MODAL ═══════════════ -->
+<div class="modal-overlay" id="receiptModal">
+  <div class="modal-box">
+    <div style="background:var(--navy)" class="p-4 flex items-center justify-between rounded-t">
+      <div class="text-white font-bold flex items-center gap-2 text-sm">
+        <i class="fas fa-certificate text-yellow-300"></i>
+        DETERMINISTIC FAIRNESS RECEIPT — TEAP AUDIT CHAIN
+      </div>
+      <button onclick="closeModal()" class="text-white opacity-60 hover:opacity-100"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="p-5" id="receiptBody">
+    </div>
+    <div class="px-5 pb-5 flex gap-2">
+      <button class="btn-primary text-xs" onclick="printReceipt()"><i class="fas fa-print mr-1"></i>Print / Export PDF</button>
+      <button class="btn-secondary text-xs" onclick="closeModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ JAVASCRIPT ═══════════════ -->
+<script>
+// ── Tab switching (cosmetic) ──
+function switchTab(t) {
+  document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+  event.target.classList.add('active');
+}
+
+// ── Bidder counter ──
+let bidderCountVal = 5;
+document.getElementById('bidderCount').textContent = bidderCountVal;
+
+// ── Drag-and-drop ──
+function handleDragOver(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.add('dragover');
+}
+function handleDragLeave(e) {
+  document.getElementById('dropZone').classList.remove('dragover');
+}
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('dragover');
+  processFiles(Array.from(e.dataTransfer.files));
+}
+function handleFileInput(e) {
+  processFiles(Array.from(e.target.files));
+}
+
+function processFiles(files) {
+  if (!files.length) return;
+  const listEl = document.getElementById('fileList');
+  const scanDiv = document.getElementById('scanStatus');
+  const piiStatusEl = document.getElementById('piiStatus');
+  const scanPctEl = document.getElementById('scanPct');
+  const scanBar = document.getElementById('scanBar');
+
+  scanDiv.classList.remove('hidden');
+  scanBar.classList.add('active');
+  piiStatusEl.textContent = 'Scanning…';
+
+  // Add file items
+  files.forEach((file, i) => {
+    const div = document.createElement('div');
+    div.className = 'file-item';
+    div.id = 'fitem-' + Date.now() + i;
+    div.innerHTML = `
+      <i class="fas fa-file-pdf text-red-400"></i>
+      <span class="flex-1 truncate text-sm">${file.name || 'document_' + (i+1) + '.pdf'} <span class="text-gray-400 text-xs">(${(file.size/1024).toFixed(0)} KB)</span></span>
+      <div class="file-progress w-24"><div class="file-progress-bar" id="fpb-${Date.now()}-${i}"></div></div>
+      <span class="text-xs text-gray-400" id="fpct-${Date.now()}-${i}">0%</span>
+    `;
+    listEl.appendChild(div);
+    // Animate
+    setTimeout(() => {
+      const bar = div.querySelector('.file-progress-bar');
+      const pct = div.querySelector('[id^="fpct"]');
+      if(bar) {
+        bar.style.width = '100%';
+        let p = 0;
+        const iv = setInterval(() => {
+          p += 7;
+          if(pct) pct.textContent = Math.min(p,100) + '%';
+          if(p >= 100) { clearInterval(iv); if(pct) pct.textContent = '✓'; }
+        }, 80);
+      }
+    }, 200 + i*300);
+  });
+
+  // Simulate PII scan
+  let pct = 0;
+  const pctIv = setInterval(() => {
+    pct += Math.floor(Math.random()*12)+4;
+    if (pct >= 100) {
+      pct = 100;
+      clearInterval(pctIv);
+      setTimeout(() => {
+        scanDiv.classList.add('hidden');
+        piiStatusEl.textContent = '5 Docs Scanned — 0 PII Detected';
+        document.getElementById('gfrStatus').textContent = 'Compliant';
+        addAgentLog('sys', 'SYS', 'PII scan complete. No sensitive data found in uploaded documents.');
+      }, 600);
+    }
+    scanPctEl.textContent = pct + '%';
+  }, 90);
+
+  // Agent logs
+  setTimeout(() => addAgentLog('tech','TECH','Parsing document metadata…'), 400);
+  setTimeout(() => addAgentLog('fin','FIN','Financial document index detected.'), 900);
+  setTimeout(() => addAgentLog('comp','COMP','GFR Rule 149 cross-check initiated.'), 1400);
+}
+
+// ── Agent Console ──
+function addAgentLog(type, label, msg) {
+  const log = document.getElementById('agentLog');
+  const now = new Date();
+  const ts = now.toTimeString().split(' ')[0];
+  const div = document.createElement('div');
+  div.className = 'log-entry ' + type;
+  div.innerHTML = `<span class="log-time">${ts}</span><span class="log-agent" style="color:${type==='tech'?'#60a5fa':type==='fin'?'#34d399':'#fbbf24'}">[${label}]</span><span>${msg}</span>`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+const AGENT_SCRIPTS = {
+  tech: [
+    'Loading Technical Evaluation Matrix (Annex-III)…',
+    'Parsing BOM tables from 5 bidder submissions…',
+    'Cross-referencing NSIC certifications (MSME)…',
+    'Validating CEMILAC compliance declarations…',
+    'Technical weighted score computation: Bharat=87.4, MSME=81.2, Defence=83.9, Star=62.1, Nova=79.8',
+    'Technical evaluation COMPLETE. Scores normalised.',
+  ],
+  fin: [
+    'Extracting L1 price data from financial bids…',
+    'Applying currency normalisation (USD/INR @83.42)…',
+    'StarShield Infra: applying 20% DPIIT loading…',
+    'L1 price identified: Innovate MSME Co. ₹14.82 Cr',
+    'Financial comparative statement generated.',
+    'Financial evaluation COMPLETE.',
+  ],
+  comp: [
+    'Initiating GFR Rule 160 compliance check…',
+    'Verifying EMD / Bank Guarantee authenticity…',
+    'DPIIT local content affidavit validation…',
+    'StarShield Infra: local content <50% — flagged.',
+    'Checking blacklist registry (CVC / MoD)…',
+    'Compliance report COMPLETE. 1 irregularity flagged.',
+  ]
+};
+let agentRunning = false;
+function runAgents() {
+  if (agentRunning) return;
+  agentRunning = true;
+  ['tech','fin','comp'].forEach(a => {
+    document.getElementById('dot-' + a).classList.add('active');
+    document.getElementById('status-' + a).textContent = 'Running';
+  });
+  let globalDelay = 0;
+  ['tech','fin','comp'].forEach(agent => {
+    AGENT_SCRIPTS[agent].forEach((line, i) => {
+      setTimeout(() => addAgentLog(agent, agent.toUpperCase(), line), globalDelay + i * 700);
+    });
+    globalDelay += 500;
+  });
+  const totalTime = Math.max(...['tech','fin','comp'].map(a => AGENT_SCRIPTS[a].length)) * 700 + 2000;
+  setTimeout(() => {
+    ['tech','fin','comp'].forEach(a => {
+      document.getElementById('dot-' + a).classList.remove('active');
+      document.getElementById('status-' + a).textContent = 'Done';
+    });
+    addAgentLog('sys','SYS','All agents completed. Ready for Committee review.');
+    agentRunning = false;
+  }, totalTime);
+}
+
+// ── Fairness Chart ──
+const CHART_ORIGINAL = [87.4, 81.2, 83.9, 62.1, 79.8];
+const CHART_MITIGATED = [87.4, 84.0, 83.9, 80.5, 84.2];
+let chartMitigated = false;
+
+const ctx = document.getElementById('fairnessChart').getContext('2d');
+const fairChart = new Chart(ctx, {
+  type: 'bar',
+  data: {
+    labels: ['Bharat Sys.', 'Innov. MSME', 'DefenceTech', 'StarShield', 'NovaSec'],
+    datasets: [{
+      label: 'Technical Score',
+      data: [...CHART_ORIGINAL],
+      backgroundColor: ['#1e40af','#f59e0b','#1e40af','#dc2626','#f59e0b'],
+      borderRadius: 3,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' Score: ' + ctx.raw } } },
+    scales: {
+      y: { beginAtZero: false, min: 50, max: 100, ticks: { font: { size: 10 } } },
+      x: { ticks: { font: { size: 10 } } }
+    }
+  }
+});
+
+function mitigateBias() {
+  if (!chartMitigated) {
+    // Update chart
+    fairChart.data.datasets[0].data = [...CHART_MITIGATED];
+    fairChart.data.datasets[0].backgroundColor = CHART_MITIGATED.map(() => '#1a7a4a');
+    fairChart.update({ duration: 800 });
+    // Update table
+    document.getElementById('dir-2').textContent = '0.84';
+    document.getElementById('badge-2').className = 'badge badge-ok';
+    document.getElementById('badge-2').textContent = 'PASS';
+    document.getElementById('dir-4').textContent = '0.82';
+    document.getElementById('badge-4').className = 'badge badge-ok';
+    document.getElementById('badge-4').textContent = 'PASS';
+    document.getElementById('dir-5').textContent = '0.83';
+    document.getElementById('badge-5').className = 'badge badge-ok';
+    document.getElementById('badge-5').textContent = 'PASS';
+    document.getElementById('mitigateNote').innerHTML = '<i class="fas fa-check-circle text-green-600 mr-1"></i><strong>Bias mitigated.</strong> MSME preference (Rule 4, MSME Order 2012) and DPIIT loading applied.';
+    document.getElementById('mitigateBtn').innerHTML = '<i class="fas fa-undo mr-1"></i>Undo Mitigation';
+    addAgentLog('comp','COMP','Bias mitigation applied. MSME and DPIIT adjustments normalised per GFR Rule 149(ii).');
+    chartMitigated = true;
+  } else {
+    fairChart.data.datasets[0].data = [...CHART_ORIGINAL];
+    fairChart.data.datasets[0].backgroundColor = ['#1e40af','#f59e0b','#1e40af','#dc2626','#f59e0b'];
+    fairChart.update({ duration: 800 });
+    document.getElementById('dir-2').textContent = '0.71';
+    document.getElementById('badge-2').className = 'badge badge-warn';
+    document.getElementById('badge-2').textContent = 'REVIEW';
+    document.getElementById('dir-4').textContent = '0.58';
+    document.getElementById('badge-4').className = 'badge badge-fail';
+    document.getElementById('badge-4').textContent = 'FAIL';
+    document.getElementById('dir-5').textContent = '0.78';
+    document.getElementById('badge-5').className = 'badge badge-warn';
+    document.getElementById('badge-5').textContent = 'REVIEW';
+    document.getElementById('mitigateNote').innerHTML = '';
+    document.getElementById('mitigateBtn').innerHTML = '<i class="fas fa-magic mr-1"></i>Mitigate Bias';
+    chartMitigated = false;
+  }
+}
+
+// ── Fairness Receipt Generator ──
+const RECEIPT_DATA = {
+  'Bharat Systems Ltd.': {
+    score: 87.4, rank: 1, dir: 0.92, tech: 88.0, fin: 86.5, comp: 88.3,
+    citations: [
+      { doc: 'RFP Document', page: 12, para: 4, text: 'Technical evaluation shall be carried out against Mandatory Technical Specifications (MTS) listed in Annex-III…' },
+      { doc: 'GFR 2017', page: 74, para: 2, text: 'The evaluation committee shall assign scores on a percentage basis against each parameter…' },
+    ],
+    notes: 'Bidder meets all Class I Local Supplier criteria. No irregularities detected.',
+  },
+  'Innovate MSME Co.': {
+    score: 81.2, rank: 3, dir: 0.71, tech: 80.5, fin: 82.1, comp: 81.0,
+    citations: [
+      { doc: 'RFP Document', page: 12, para: 4, text: 'Technical evaluation shall be carried out against Mandatory Technical Specifications (MTS) listed in Annex-III…' },
+      { doc: 'MSME Order 2012', page: 3, para: 7, text: 'MSME vendors shall receive a price preference of up to 15% in government procurement…' },
+    ],
+    notes: 'DIR below threshold prior to mitigation. MSME preference applied per Rule 4, MSME Order 2012. Post-mitigation DIR: 0.84.',
+  },
+  'DefenceTech Pvt.': {
+    score: 83.9, rank: 2, dir: 0.85, tech: 84.2, fin: 83.5, comp: 84.1,
+    citations: [
+      { doc: 'RFP Document', page: 12, para: 4, text: 'Technical evaluation shall be carried out against Mandatory Technical Specifications (MTS) listed in Annex-III…' },
+    ],
+    notes: 'No irregularities. Compliant with CEMILAC requirements. DPIIT Verify status pending submission of updated Affidavit.',
+  },
+  'StarShield Infra': {
+    score: 62.1, rank: 5, dir: 0.58, tech: 62.0, fin: 69.3, comp: 55.1,
+    citations: [
+      { doc: 'DPIIT Order 2017', page: 8, para: 3, text: 'Foreign suppliers with less than 50% domestic content shall be classified as non-local and shall be subject to price loading of 20%…' },
+      { doc: 'RFP Document', page: 12, para: 4, text: 'Technical evaluation shall be carried out against Mandatory Technical Specifications (MTS) listed in Annex-III…' },
+    ],
+    notes: 'CRITICAL: Local content 22% — below 50% threshold. 20% DPIIT price loading applied. Compliance score impacted by missing NSIC certificate.',
+  },
+  'NovaSec Dynamics': {
+    score: 79.8, rank: 4, dir: 0.78, tech: 79.5, fin: 80.1, comp: 79.9,
+    citations: [
+      { doc: 'RFP Document', page: 12, para: 4, text: 'Technical evaluation shall be carried out against Mandatory Technical Specifications (MTS) listed in Annex-III…' },
+      { doc: 'MSME Order 2012', page: 3, para: 7, text: 'MSME vendors shall receive a price preference of up to 15% in government procurement…' },
+    ],
+    notes: 'Women-led MSME. DIR below threshold prior to mitigation. Post-mitigation DIR: 0.83. Class I Local Supplier.',
+  }
+};
+
+function generateReceipt() {
+  const bidder = document.getElementById('receiptBidder').value;
+  const stage = document.getElementById('receiptStage').value;
+  const d = RECEIPT_DATA[bidder];
+  const now = new Date();
+  const ts = now.toLocaleDateString('en-IN', {day:'2-digit',month:'long',year:'numeric'}) + ' ' + now.toTimeString().split(' ')[0];
+  const hash = 'TEAP-' + Math.random().toString(36).substr(2,8).toUpperCase() + '-' + Date.now().toString(36).toUpperCase();
+
+  let citHTML = d.citations.map(c => `
+    <div class="border-l-4 border-blue-700 pl-3 py-1 mb-2 bg-blue-50 rounded">
+      <div class="text-xs font-bold text-blue-800 mb-0.5">${c.doc} — Page ${c.page}, Para ${c.para}</div>
+      <div class="text-xs text-gray-600 italic">"${c.text}"</div>
+    </div>
+  `).join('');
+
+  const statusColor = d.score >= 80 ? '#065f46' : d.score >= 70 ? '#92400e' : '#991b1b';
+  const statusBg = d.score >= 80 ? '#d1fae5' : d.score >= 70 ? '#fef3c7' : '#fee2e2';
+  const statusTxt = d.score >= 80 ? 'QUALIFIED' : d.score >= 70 ? 'CONDITIONAL' : 'DISQUALIFIED';
+
+  document.getElementById('receiptBody').innerHTML = `
+    <div style="border:1.5px solid #002147; border-radius:4px; padding:18px">
+      <!-- Watermark -->
+      <div style="position:relative">
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);font-size:52px;opacity:0.04;font-weight:900;letter-spacing:.1em;color:var(--navy);pointer-events:none;user-select:none">RESTRICTED</div>
+      </div>
+      <!-- Header -->
+      <div class="flex items-center gap-3 mb-4 pb-3" style="border-bottom:2px solid var(--navy)">
+        <div style="width:44px;height:44px;background:var(--navy);border-radius:50%;display:flex;align-items:center;justify-content:center">
+          <i class="fas fa-certificate" style="color:#d4a820;font-size:20px"></i>
+        </div>
+        <div>
+          <div class="font-bold text-sm" style="color:var(--navy)">PROJECT TEAP — FAIRNESS RECEIPT</div>
+          <div class="text-xs text-gray-500">Issued by: FairCheck™ Deterministic Engine v2.4.1 &nbsp;·&nbsp; TEAP Audit Chain</div>
+        </div>
+        <div class="ml-auto text-right">
+          <div class="text-xs text-gray-400">Receipt Hash</div>
+          <div class="text-xs font-mono font-bold" style="color:var(--navy)">${hash}</div>
+          <div class="text-xs text-gray-400 mt-0.5">${ts} IST</div>
+        </div>
+      </div>
+      <!-- Bidder info -->
+      <div class="grid grid-cols-2 gap-4 mb-4">
+        <div>
+          <div class="text-xs text-gray-400 uppercase font-semibold mb-1">Bidder</div>
+          <div class="font-bold text-sm">${bidder}</div>
+        </div>
+        <div>
+          <div class="text-xs text-gray-400 uppercase font-semibold mb-1">Tender Reference</div>
+          <div class="font-bold text-sm">CAPF/MHA/2026/T-0091</div>
+        </div>
+        <div>
+          <div class="text-xs text-gray-400 uppercase font-semibold mb-1">Evaluation Stage</div>
+          <div class="font-bold text-sm">${stage}</div>
+        </div>
+        <div>
+          <div class="text-xs text-gray-400 uppercase font-semibold mb-1">Overall Rank</div>
+          <div class="font-bold text-sm">Rank ${d.rank} of 5 Bidders</div>
+        </div>
+      </div>
+      <!-- Score summary -->
+      <div class="flex gap-2 mb-4 flex-wrap">
+        <div class="flex-1 text-center p-2 rounded" style="background:#e8edf5;min-width:80px">
+          <div class="text-2xl font-bold" style="color:var(--navy);font-family:'EB Garamond',serif">${d.score}</div>
+          <div class="text-xs text-gray-500">Composite Score</div>
+        </div>
+        <div class="flex-1 text-center p-2 rounded" style="background:#e8edf5;min-width:80px">
+          <div class="text-xl font-bold" style="color:#1e40af">${d.tech}</div>
+          <div class="text-xs text-gray-500">Technical</div>
+        </div>
+        <div class="flex-1 text-center p-2 rounded" style="background:#e8edf5;min-width:80px">
+          <div class="text-xl font-bold" style="color:#065f46">${d.fin}</div>
+          <div class="text-xs text-gray-500">Financial</div>
+        </div>
+        <div class="flex-1 text-center p-2 rounded" style="background:#e8edf5;min-width:80px">
+          <div class="text-xl font-bold" style="color:#92400e">${d.comp}</div>
+          <div class="text-xs text-gray-500">Compliance</div>
+        </div>
+        <div class="flex-1 text-center p-2 rounded font-bold" style="background:${statusBg};color:${statusColor};min-width:80px">
+          <div class="text-sm font-bold">${statusTxt}</div>
+          <div class="text-xs">DIR: ${d.dir}</div>
+        </div>
+      </div>
+      <!-- Citations -->
+      <div class="mb-3">
+        <div class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2" style="border-bottom:1px solid #e5e7eb;padding-bottom:4px">Regulatory Justifications</div>
+        ${citHTML}
+      </div>
+      <!-- Notes -->
+      <div class="text-xs bg-gray-50 border border-gray-200 rounded p-3 mb-3">
+        <span class="font-semibold text-gray-700">Evaluator Notes: </span><span class="text-gray-600">${d.notes}</span>
+      </div>
+      <!-- Signature block -->
+      <div class="grid grid-cols-3 gap-4 mt-4 pt-3" style="border-top:1px solid #e5e7eb">
+        <div class="text-center">
+          <div class="text-xs text-gray-400 mb-4">Technical Member</div>
+          <div style="border-bottom:1px solid #999;margin-bottom:4px"></div>
+          <div class="text-xs text-gray-500">Signature & Seal</div>
+        </div>
+        <div class="text-center">
+          <div class="text-xs text-gray-400 mb-4">Financial Advisor</div>
+          <div style="border-bottom:1px solid #999;margin-bottom:4px"></div>
+          <div class="text-xs text-gray-500">Signature & Seal</div>
+        </div>
+        <div class="text-center">
+          <div class="text-xs text-gray-400 mb-4">Tender Committee Chair</div>
+          <div style="border-bottom:1px solid #999;margin-bottom:4px"></div>
+          <div class="text-xs text-gray-500">Signature & Seal</div>
+        </div>
+      </div>
+      <div class="text-center text-xs text-gray-400 mt-3">
+        This receipt is system-generated and tamper-evident. Any alteration renders it void. &nbsp;·&nbsp; Hash: ${hash}
+      </div>
+    </div>
+  `;
+  document.getElementById('receiptModal').classList.add('open');
+}
+function closeModal() { document.getElementById('receiptModal').classList.remove('open'); }
+function printReceipt() { window.print(); }
+
+// Close modal on overlay click
+document.getElementById('receiptModal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+</script>
+</body>
+</html>
